@@ -1,7 +1,6 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
-import math
 import matplotlib.pyplot as plt
 from PIL import Image
 import base64
@@ -338,52 +337,66 @@ with tab_demo:
     with subtab_image:
         st.markdown("### Image Cryptography")
         
-        # We assume Encryption workflow first, which allows internal verification
-        img_file = st.file_uploader("Upload Original Image", type=["png", "jpg", "jpeg"])
-        k_img = st.text_input("Encryption Key", "MYSECRETKEY", type="password", key="kimg")
+        i_mode = st.radio("Image Operation", ["Encrypt Image", "Decrypt Image"], horizontal=True)
         
-        if img_file and k_img:
-            # Load Original
-            img_orig = Image.open(img_file).convert("RGB")
+        if i_mode == "Encrypt Image":
+            st.subheader("Encryption Mode")
+            img_file = st.file_uploader("Upload Original Image", type=["png", "jpg", "jpeg"])
+            k_img = st.text_input("Encryption Key", "MYSECRETKEY", type="password", key="kimg_enc")
             
-            if st.button("Run Encryption & Analysis"):
-                # 1. Encrypt
-                arr = np.array(img_orig)
-                shape = arr.shape
-                enc_bytes = encrypt_bytes(arr.flatten(), k_img, current_sbox)
-                img_enc = Image.fromarray(np.array(enc_bytes, dtype=np.uint8).reshape(shape), "RGB")
+            if img_file and k_img:
+                img_orig = Image.open(img_file).convert("RGB")
                 
-                # 2. Decrypt (Verification)
-                dec_bytes = decrypt_bytes(enc_bytes, k_img, current_inv)
-                img_dec = Image.fromarray(np.array(dec_bytes, dtype=np.uint8).reshape(shape), "RGB")
-                
-                # --- VISUALIZATION ROW 1: ORIGINAL vs ENCRYPTED ---
-                st.subheader("1. Encryption Result (Confusion & Diffusion)")
-                c1, c2 = st.columns(2)
-                
-                with c1:
-                    st.image(img_orig, caption="Original Image", use_container_width=True)
-                    st.pyplot(plot_rgb_histogram(img_orig))
+                if st.button("Encrypt & Analyze"):
+                    # Process
+                    arr = np.array(img_orig)
+                    shape = arr.shape
+                    enc_bytes = encrypt_bytes(arr.flatten(), k_img, current_sbox)
+                    img_enc = Image.fromarray(np.array(enc_bytes, dtype=np.uint8).reshape(shape), "RGB")
                     
-                with c2:
-                    st.image(img_enc, caption=f"Encrypted ({selected_matrix_name})", use_container_width=True)
-                    st.pyplot(plot_rgb_histogram(img_enc))
-                
-                st.divider()
-                
-                # --- VISUALIZATION ROW 2: ORIGINAL vs DECRYPTED ---
-                st.subheader("2. Decryption Verification (Correctness)")
-                c3, c4 = st.columns(2)
-                
-                with c3:
-                    st.image(img_orig, caption="Original Input", use_container_width=True)
-                    st.pyplot(plot_rgb_histogram(img_orig))
+                    # Display Side-by-Side
+                    c_l, c_r = st.columns(2)
                     
-                with c4:
-                    st.image(img_dec, caption="Decrypted Result", use_container_width=True)
-                    st.pyplot(plot_rgb_histogram(img_dec))
+                    with c_l:
+                        st.image(img_orig, caption="Original Image", use_container_width=True)
+                        st.pyplot(plot_rgb_histogram(img_orig), use_container_width=True)
+                        
+                    with c_r:
+                        st.image(img_enc, caption=f"Encrypted Image ({selected_matrix_name})", use_container_width=True)
+                        st.pyplot(plot_rgb_histogram(img_enc), use_container_width=True)
+                    
+                    # Download
+                    buf = io.BytesIO()
+                    img_enc.save(buf, format="PNG")
+                    st.download_button("Download Encrypted Image (PNG)", buf.getvalue(), "encrypted.png", "image/png")
 
-                # Download Button
-                buf = io.BytesIO()
-                img_enc.save(buf, format="PNG")
-                st.download_button("Download Encrypted Image (PNG)", buf.getvalue(), "encrypted.png", "image/png")
+        else: # Decrypt Mode
+            st.subheader("Decryption Mode")
+            enc_file = st.file_uploader("Upload Encrypted Image (PNG)", type=["png"])
+            k_img_d = st.text_input("Decryption Key", "MYSECRETKEY", type="password", key="kimg_dec")
+            
+            if enc_file and k_img_d:
+                img_enc = Image.open(enc_file).convert("RGB")
+                
+                if st.button("Decrypt & Analyze"):
+                    # Process
+                    arr = np.array(img_enc)
+                    shape = arr.shape
+                    dec_bytes = decrypt_bytes(arr.flatten(), k_img_d, current_inv)
+                    img_dec = Image.fromarray(np.array(dec_bytes, dtype=np.uint8).reshape(shape), "RGB")
+                    
+                    # Display Side-by-Side
+                    c_l, c_r = st.columns(2)
+                    
+                    with c_l:
+                        st.image(img_enc, caption="Encrypted Input", use_container_width=True)
+                        st.pyplot(plot_rgb_histogram(img_enc), use_container_width=True)
+                        
+                    with c_r:
+                        st.image(img_dec, caption="Decrypted Result", use_container_width=True)
+                        st.pyplot(plot_rgb_histogram(img_dec), use_container_width=True)
+                    
+                    # Download
+                    buf = io.BytesIO()
+                    img_dec.save(buf, format="PNG")
+                    st.download_button("Download Decrypted Image (PNG)", buf.getvalue(), "decrypted.png", "image/png")
