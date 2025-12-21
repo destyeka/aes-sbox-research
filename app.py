@@ -169,25 +169,23 @@ def calculate_metrics(sbox_tuple):
     }
 
 # ==========================================
-# 4. ENCRYPTION HELPER FUNCTIONS
+# 4. HELPER FUNCTIONS (CRYPTO & PLOTTING)
 # ==========================================
 def encrypt_bytes(data_bytes, key_string, sbox):
-    """Generic Encryption Logic (Key Mixing + S-box)"""
+    """Generic Encryption Logic"""
     key_bytes = [ord(k) for k in key_string]
     if len(key_bytes) == 0: return data_bytes 
     
     enc_bytes = []
-    # Rolling IV for diffusion (CBC-like)
     iv = sum(key_bytes) % 256
     prev = iv
     
     for i, b in enumerate(data_bytes):
         k = key_bytes[i % len(key_bytes)]
-        # Mix: (Byte XOR Key XOR Previous_Cipher) -> Sbox
         mixed = b ^ k ^ prev
         c = sbox[mixed]
         enc_bytes.append(c)
-        prev = c # Chain
+        prev = c 
         
     return enc_bytes
 
@@ -202,13 +200,30 @@ def decrypt_bytes(enc_bytes, key_string, inv_sbox):
     
     for i, c in enumerate(enc_bytes):
         k = key_bytes[i % len(key_bytes)]
-        # Reverse: InvSbox[Cipher] XOR Key XOR Previous_Cipher
         p_mixed = inv_sbox[c]
         p = p_mixed ^ k ^ prev
         dec_bytes.append(p)
-        prev = c # Use current cipher as prev for next
+        prev = c 
         
     return dec_bytes
+
+def plot_rgb_histogram(image_pil):
+    """Generates a Matplotlib Figure for RGB Histogram"""
+    img_arr = np.array(image_pil)
+    fig, ax = plt.subplots(figsize=(6, 2.5))
+    
+    if len(img_arr.shape) == 3: # RGB
+        colors = ['red', 'green', 'blue']
+        for i, color in enumerate(colors):
+            ax.hist(img_arr[:, :, i].ravel(), bins=256, color=color, alpha=0.5, label=color.upper())
+    else: # Grayscale
+        ax.hist(img_arr.ravel(), bins=256, color='gray', alpha=0.7, label='Gray')
+    
+    ax.set_title("RGB Pixel Distribution")
+    ax.set_xlim([0, 256])
+    ax.legend(prop={'size': 8})
+    plt.tight_layout()
+    return fig
 
 # ==========================================
 # 5. STREAMLIT UI
@@ -222,11 +237,10 @@ Implementation of **"AES S-box modification uses affine matrices exploration"**.
 Use the tabs below to analyze S-box strength or deploy encryption algorithms.
 """)
 
-# --- SIDEBAR CONFIG ---
+# --- SIDEBAR ---
 st.sidebar.header("⚙️ Configuration")
 selected_matrix_name = st.sidebar.selectbox("Select K-Matrix (Affine)", list(K_MATRICES.keys()), index=2)
 
-# Calculate Metrics (Cached)
 all_metrics = []
 sbox_db = {}
 for name in K_MATRICES.keys():
@@ -239,11 +253,11 @@ for name in K_MATRICES.keys():
 df_all = pd.DataFrame(all_metrics).set_index("Name")
 current_sbox, current_inv = sbox_db[selected_matrix_name]
 
-# Identify Best Matrix (K-44 Proposed) by S-Value
+# Best matrix
 df_all["S-Value"] = (abs(df_all["SAC"] - 0.5) + abs(df_all["BIC-SAC"] - 0.5)) / 2
 best_name = df_all.drop("AES Standard")["S-Value"].idxmin()
 
-# --- TABS LAYOUT ---
+# --- TABS ---
 tab_analysis, tab_demo = st.tabs(["📊 S-Box Analysis", "🔐 Encryption Demo"])
 
 # =========================================================
@@ -251,152 +265,125 @@ tab_analysis, tab_demo = st.tabs(["📊 S-Box Analysis", "🔐 Encryption Demo"]
 # =========================================================
 with tab_analysis:
     st.header(f"1. S-Box Matrix: {selected_matrix_name}")
-    
-    col_v1, col_v2 = st.columns(2)
-    with col_v1:
-        st.subheader("Decimal Table")
-        grid_dec = pd.DataFrame(np.array(current_sbox).reshape(16, 16))
-        st.dataframe(grid_dec, height=250, use_container_width=True)
-    with col_v2:
-        st.subheader("Hexadecimal Table")
-        hex_grid = [[f"{val:02X}" for val in row] for row in np.array(current_sbox).reshape(16, 16)]
-        grid_hex = pd.DataFrame(hex_grid)
-        st.dataframe(grid_hex, height=250, use_container_width=True)
+    c1, c2 = st.columns(2)
+    with c1:
+        st.subheader("Decimal")
+        st.dataframe(pd.DataFrame(np.array(current_sbox).reshape(16, 16)), height=250)
+    with c2:
+        st.subheader("Hexadecimal")
+        st.dataframe(pd.DataFrame([[f"{x:02X}" for x in r] for r in np.array(current_sbox).reshape(16, 16)]), height=250)
 
     st.divider()
-
     st.header("2. Performance Comparison")
     
-    # Constructing the Comparison Table
-    # We want columns: [AES Standard, Best Proposed, Selected, Target]
-    
-    # Define Targets (Ideal Values)
+    # Target Values
     targets = {
-        "NL": "Max (112)",
-        "SAC": "0.5",
-        "BIC-NL": "High",
-        "BIC-SAC": "0.5",
-        "LAP": "Min (0)",
-        "DAP": "Min (0)",
-        "DU": "Min (4)",
-        "AD": "7",
-        "TO": "Min (0)",
-        "S-Value": "0"
+        "NL": "Max (112)", "SAC": "0.5", "BIC-NL": "High", "BIC-SAC": "0.5",
+        "LAP": "Min (0)", "DAP": "Min (0)", "DU": "Min (4)", "AD": "7", "TO": "Min (0)", "S-Value": "0"
     }
     
-    # Extract Columns
-    cols_to_show = ["AES Standard", best_name]
-    if selected_matrix_name not in cols_to_show:
-        cols_to_show.append(selected_matrix_name)
+    cols = ["AES Standard", best_name]
+    if selected_matrix_name not in cols: cols.append(selected_matrix_name)
     
-    # Create comparison dataframe (Transposed)
-    comp_df = df_all.loc[cols_to_show].T
+    comp_df = df_all.loc[cols].T
+    comp_df["Target (Ideal)"] = [targets.get(i, "-") for i in comp_df.index]
     
-    # Add Target Column
-    comp_df["Target (Ideal)"] = [targets.get(idx, "-") for idx in comp_df.index]
-    
-    # Formatting helper
-    def highlight_target(s):
-        return ['background-color: #f0f2f6; font-weight: bold' if s.name == "Target (Ideal)" else '' for _ in s]
+    # Highlight Target Column
+    def style_target(s):
+        return ['background-color: #e6f3ff; font-weight: bold' if s.name == "Target (Ideal)" else '' for _ in s]
 
-    st.table(comp_df.style.format("{:.5f}", subset=cols_to_show).apply(highlight_target, axis=0))
-    
-    st.info(f"**Conclusion:** The matrix **{best_name}** is highlighted as the best proposed candidate based on the S-Value (Closeness to ideal SAC/BIC).")
-
+    st.table(comp_df.style.format("{:.5f}", subset=cols).apply(style_target, axis=0))
 
 # =========================================================
 # TAB 2: ENCRYPTION / DECRYPTION DEMOS
 # =========================================================
 with tab_demo:
     st.header("Real-World Deployment")
-    
-    subtab_text, subtab_image = st.tabs(["🔤 Text Tool", "🖼️ Image Tool (RGB)"])
+    subtab_text, subtab_image = st.tabs(["🔤 Text Tool", "🖼️ Image Tool (RGB + Histogram)"])
 
     # --- TEXT TOOL ---
     with subtab_text:
         st.markdown("### Text Cryptography")
-        t_mode = st.radio("Mode", ["Encrypt", "Decrypt"], horizontal=True, key="t_mode")
+        t_mode = st.radio("Mode", ["Encrypt", "Decrypt"], horizontal=True)
         
-        col_t1, col_t2 = st.columns(2)
-        
+        c1, c2 = st.columns(2)
         if t_mode == "Encrypt":
-            with col_t1:
-                txt_in = st.text_area("Plaintext", "Research Project: AES S-box 2025")
-                key_in = st.text_input("Key", "MYKEY", type="password", key="tk1")
-                if st.button("Encrypt Text"):
-                    if not key_in: st.error("Key required")
+            with c1:
+                txt_in = st.text_area("Plaintext", "Research Project 2025")
+                k_in = st.text_input("Key", "MYKEY", type="password")
+                if st.button("Encrypt"):
+                    if not k_in: st.error("Key required")
                     else:
-                        d = [ord(c) for c in txt_in]
-                        enc = encrypt_bytes(d, key_in, current_sbox)
-                        b64 = base64.b64encode(bytes(enc)).decode()
-                        st.session_state['res_txt'] = b64
-            with col_t2:
-                st.info("Encrypted Output (Base64)")
-                if 'res_txt' in st.session_state:
-                    st.code(st.session_state['res_txt'], language="text")
-
-        else: # Decrypt
-            with col_t1:
-                cipher_in = st.text_area("Ciphertext (Base64)", "")
-                key_in_d = st.text_input("Key", "MYKEY", type="password", key="tk2")
-                if st.button("Decrypt Text"):
-                    if not key_in_d: st.error("Key required")
+                        enc = encrypt_bytes([ord(c) for c in txt_in], k_in, current_sbox)
+                        st.session_state['res_txt'] = base64.b64encode(bytes(enc)).decode()
+            with c2:
+                st.info("Encrypted (Base64)")
+                if 'res_txt' in st.session_state: st.code(st.session_state['res_txt'])
+        else:
+            with c1:
+                c_in = st.text_area("Ciphertext", "")
+                k_in = st.text_input("Key", "MYKEY", type="password", key="kd")
+                if st.button("Decrypt"):
+                    if not k_in: st.error("Key required")
                     else:
                         try:
-                            raw = base64.b64decode(cipher_in)
-                            dec = decrypt_bytes(raw, key_in_d, current_inv)
-                            res = "".join([chr(c) for c in dec])
-                            st.session_state['res_plain'] = res
-                        except: st.error("Invalid Base64 or Key")
-            with col_t2:
-                st.success("Decrypted Output")
-                if 'res_plain' in st.session_state:
-                    st.write(st.session_state['res_plain'])
+                            dec = decrypt_bytes(base64.b64decode(c_in), k_in, current_inv)
+                            st.session_state['res_pln'] = "".join([chr(c) for c in dec])
+                        except: st.error("Error")
+            with c2:
+                st.success("Decrypted")
+                if 'res_pln' in st.session_state: st.write(st.session_state['res_pln'])
 
     # --- IMAGE TOOL ---
     with subtab_image:
-        st.markdown("### Image Cryptography (Full Color Support)")
-        i_mode = st.radio("Mode", ["Encrypt Image", "Decrypt Image"], horizontal=True, key="i_mode")
+        st.markdown("### Image Cryptography")
         
-        if i_mode == "Encrypt Image":
-            img_file = st.file_uploader("Upload Original (JPG/PNG)", type=["png", "jpg", "jpeg"])
-            k_img = st.text_input("Key", "MYKEY", type="password", key="ik1")
+        # We assume Encryption workflow first, which allows internal verification
+        img_file = st.file_uploader("Upload Original Image", type=["png", "jpg", "jpeg"])
+        k_img = st.text_input("Encryption Key", "MYSECRETKEY", type="password", key="kimg")
+        
+        if img_file and k_img:
+            # Load Original
+            img_orig = Image.open(img_file).convert("RGB")
             
-            if img_file and k_img:
-                img = Image.open(img_file).convert("RGB")
-                st.image(img, caption="Original", width=300)
+            if st.button("Run Encryption & Analysis"):
+                # 1. Encrypt
+                arr = np.array(img_orig)
+                shape = arr.shape
+                enc_bytes = encrypt_bytes(arr.flatten(), k_img, current_sbox)
+                img_enc = Image.fromarray(np.array(enc_bytes, dtype=np.uint8).reshape(shape), "RGB")
                 
-                if st.button("Encrypt Image"):
-                    arr = np.array(img)
-                    shape = arr.shape
-                    flat = arr.flatten()
+                # 2. Decrypt (Verification)
+                dec_bytes = decrypt_bytes(enc_bytes, k_img, current_inv)
+                img_dec = Image.fromarray(np.array(dec_bytes, dtype=np.uint8).reshape(shape), "RGB")
+                
+                # --- VISUALIZATION ROW 1: ORIGINAL vs ENCRYPTED ---
+                st.subheader("1. Encryption Result (Confusion & Diffusion)")
+                c1, c2 = st.columns(2)
+                
+                with c1:
+                    st.image(img_orig, caption="Original Image", use_container_width=True)
+                    st.pyplot(plot_rgb_histogram(img_orig))
                     
-                    enc_flat = encrypt_bytes(flat, k_img, current_sbox)
-                    enc_arr = np.array(enc_flat, dtype=np.uint8).reshape(shape)
-                    enc_img = Image.fromarray(enc_arr, mode="RGB")
+                with c2:
+                    st.image(img_enc, caption=f"Encrypted ({selected_matrix_name})", use_container_width=True)
+                    st.pyplot(plot_rgb_histogram(img_enc))
+                
+                st.divider()
+                
+                # --- VISUALIZATION ROW 2: ORIGINAL vs DECRYPTED ---
+                st.subheader("2. Decryption Verification (Correctness)")
+                c3, c4 = st.columns(2)
+                
+                with c3:
+                    st.image(img_orig, caption="Original Input", use_container_width=True)
+                    st.pyplot(plot_rgb_histogram(img_orig))
                     
-                    st.image(enc_img, caption="Encrypted (Noise)", width=300)
-                    
-                    # Download
-                    buf = io.BytesIO()
-                    enc_img.save(buf, format="PNG")
-                    st.download_button("Download Encrypted PNG", buf.getvalue(), "encrypted.png", "image/png")
+                with c4:
+                    st.image(img_dec, caption="Decrypted Result", use_container_width=True)
+                    st.pyplot(plot_rgb_histogram(img_dec))
 
-        else: # Decrypt
-            enc_file = st.file_uploader("Upload Encrypted (PNG)", type=["png"])
-            k_img_d = st.text_input("Key", "MYKEY", type="password", key="ik2")
-            
-            if enc_file and k_img_d:
-                img_enc = Image.open(enc_file).convert("RGB")
-                st.image(img_enc, caption="Encrypted Input", width=300)
-                
-                if st.button("Decrypt Image"):
-                    arr = np.array(img_enc)
-                    shape = arr.shape
-                    flat = arr.flatten()
-                    
-                    dec_flat = decrypt_bytes(flat, k_img_d, current_inv)
-                    dec_arr = np.array(dec_flat, dtype=np.uint8).reshape(shape)
-                    dec_img = Image.fromarray(dec_arr, mode="RGB")
-                    
-                    st.image(dec_img, caption="Decrypted Result", width=300)
+                # Download Button
+                buf = io.BytesIO()
+                img_enc.save(buf, format="PNG")
+                st.download_button("Download Encrypted Image (PNG)", buf.getvalue(), "encrypted.png", "image/png")
