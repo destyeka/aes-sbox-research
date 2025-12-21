@@ -171,7 +171,6 @@ def calculate_metrics(sbox_tuple):
 # 4. HELPER FUNCTIONS (CRYPTO & PLOTTING)
 # ==========================================
 def encrypt_bytes(data_bytes, key_string, sbox):
-    """Generic Encryption Logic"""
     key_bytes = [ord(k) for k in key_string]
     if len(key_bytes) == 0: return data_bytes 
     
@@ -189,7 +188,6 @@ def encrypt_bytes(data_bytes, key_string, sbox):
     return enc_bytes
 
 def decrypt_bytes(enc_bytes, key_string, inv_sbox):
-    """Generic Decryption Logic"""
     key_bytes = [ord(k) for k in key_string]
     if len(key_bytes) == 0: return enc_bytes
     
@@ -207,17 +205,14 @@ def decrypt_bytes(enc_bytes, key_string, inv_sbox):
     return dec_bytes
 
 def plot_rgb_histogram(image_pil):
-    """Generates a Matplotlib Figure for RGB Histogram"""
     img_arr = np.array(image_pil)
     fig, ax = plt.subplots(figsize=(6, 2.5))
-    
-    if len(img_arr.shape) == 3: # RGB
+    if len(img_arr.shape) == 3: 
         colors = ['red', 'green', 'blue']
         for i, color in enumerate(colors):
             ax.hist(img_arr[:, :, i].ravel(), bins=256, color=color, alpha=0.5, label=color.upper())
-    else: # Grayscale
+    else: 
         ax.hist(img_arr.ravel(), bins=256, color='gray', alpha=0.7, label='Gray')
-    
     ax.set_title("RGB Pixel Distribution")
     ax.set_xlim([0, 256])
     ax.legend(prop={'size': 8})
@@ -233,7 +228,6 @@ st.set_page_config(page_title="AES S-Box Research Tool", layout="wide", page_ico
 st.title("🔐 AES S-Box Research & Deployment Tool")
 st.markdown("""
 Implementation of **"AES S-box modification uses affine matrices exploration"**.
-Use the tabs below to analyze S-box strength or deploy encryption algorithms.
 """)
 
 # --- SIDEBAR ---
@@ -278,20 +272,46 @@ with tab_analysis:
     # Target Values
     targets = {
         "NL": "Max (112)", "SAC": "0.5", "BIC-NL": "High", "BIC-SAC": "0.5",
-        "LAP": "Min (0)", "DAP": "Min (0)", "DU": "Min (4)", "AD": "7", "TO": "Min (0)", "S-Value": "0"
+        "LAP": "Min (0)", "DAP": "Min (0)", "DU": "Min (4)", "AD": "Max (7)", "TO": "Min (0)", "S-Value": "Min (0)"
     }
     
+    # Prepare Dataframe
     cols = ["AES Standard", best_name]
     if selected_matrix_name not in cols: cols.append(selected_matrix_name)
-    
     comp_df = df_all.loc[cols].T
     comp_df["Target (Ideal)"] = [targets.get(i, "-") for i in comp_df.index]
     
-    # Highlight Target Column
-    def style_target(s):
-        return ['background-color: #e6f3ff; font-weight: bold' if s.name == "Target (Ideal)" else '' for _ in s]
+    # --- STYLING LOGIC ---
+    def style_comparison(styler):
+        # 1. Highlight Target Column (Blue)
+        styler.set_properties(subset=["Target (Ideal)"], **{'background-color': '#e6f3ff', 'font-weight': 'bold'})
+        
+        # 2. Highlight Best Value per Row (Green)
+        # Iterate over rows
+        for idx in styler.index:
+            # Get values for data columns only (exclude Target)
+            data_cols = [c for c in styler.columns if c != "Target (Ideal)"]
+            row_vals = styler.data.loc[idx, data_cols]
+            
+            best_val = None
+            if idx in ["NL", "AD", "BIC-NL"]: # Max is best
+                best_val = row_vals.max()
+            elif idx in ["SAC", "BIC-SAC"]:   # Closest to 0.5 is best
+                best_val = row_vals.iloc[(row_vals - 0.5).abs().argmin()]
+            else:                             # Min is best (LAP, DAP, DU, TO, S-Value)
+                best_val = row_vals.min()
+            
+            # Apply style
+            for col in data_cols:
+                if row_vals[col] == best_val:
+                    styler.set_properties(subset=pd.IndexSlice[idx, col], **{'background-color': '#d4edda', 'color': 'green', 'font-weight': 'bold'})
+        return styler
 
-    st.table(comp_df.style.format("{:.5f}", subset=cols).apply(style_target, axis=0))
+    # Render Styled Table
+    st.table(style_comparison(comp_df.style.format("{:.5f}", subset=cols)))
+    
+    st.caption("🟢 **Green**: Best value among selected matrices. | 🔵 **Blue**: Ideal theoretical target.")
+
 
 # =========================================================
 # TAB 2: ENCRYPTION / DECRYPTION DEMOS
@@ -348,24 +368,19 @@ with tab_demo:
                 img_orig = Image.open(img_file).convert("RGB")
                 
                 if st.button("Encrypt & Analyze"):
-                    # Process
                     arr = np.array(img_orig)
                     shape = arr.shape
                     enc_bytes = encrypt_bytes(arr.flatten(), k_img, current_sbox)
                     img_enc = Image.fromarray(np.array(enc_bytes, dtype=np.uint8).reshape(shape), "RGB")
                     
-                    # Display Side-by-Side
                     c_l, c_r = st.columns(2)
-                    
                     with c_l:
                         st.image(img_orig, caption="Original Image", use_container_width=True)
                         st.pyplot(plot_rgb_histogram(img_orig), use_container_width=True)
-                        
                     with c_r:
                         st.image(img_enc, caption=f"Encrypted Image ({selected_matrix_name})", use_container_width=True)
                         st.pyplot(plot_rgb_histogram(img_enc), use_container_width=True)
                     
-                    # Download
                     buf = io.BytesIO()
                     img_enc.save(buf, format="PNG")
                     st.download_button("Download Encrypted Image (PNG)", buf.getvalue(), "encrypted.png", "image/png")
@@ -379,24 +394,19 @@ with tab_demo:
                 img_enc = Image.open(enc_file).convert("RGB")
                 
                 if st.button("Decrypt & Analyze"):
-                    # Process
                     arr = np.array(img_enc)
                     shape = arr.shape
                     dec_bytes = decrypt_bytes(arr.flatten(), k_img_d, current_inv)
                     img_dec = Image.fromarray(np.array(dec_bytes, dtype=np.uint8).reshape(shape), "RGB")
                     
-                    # Display Side-by-Side
                     c_l, c_r = st.columns(2)
-                    
                     with c_l:
                         st.image(img_enc, caption="Encrypted Input", use_container_width=True)
                         st.pyplot(plot_rgb_histogram(img_enc), use_container_width=True)
-                        
                     with c_r:
                         st.image(img_dec, caption="Decrypted Result", use_container_width=True)
                         st.pyplot(plot_rgb_histogram(img_dec), use_container_width=True)
                     
-                    # Download
                     buf = io.BytesIO()
                     img_dec.save(buf, format="PNG")
                     st.download_button("Download Decrypted Image (PNG)", buf.getvalue(), "decrypted.png", "image/png")
