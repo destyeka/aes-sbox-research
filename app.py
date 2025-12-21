@@ -105,7 +105,6 @@ def calculate_algebraic_degree(sbox):
     return max_degree
 
 def calculate_transparency_order(sbox):
-    # Simplified spectral proxy for speed
     sbox_np = np.array(sbox)
     total_beta_vals = []
     for beta in range(1, SIZE):
@@ -170,15 +169,57 @@ def calculate_metrics(sbox_tuple):
     }
 
 # ==========================================
-# 4. STREAMLIT UI
+# 4. ENCRYPTION HELPER FUNCTIONS
+# ==========================================
+def encrypt_bytes(data_bytes, key_string, sbox):
+    """Generic Encryption Logic (Key Mixing + S-box)"""
+    key_bytes = [ord(k) for k in key_string]
+    if len(key_bytes) == 0: return data_bytes # Safety
+    
+    enc_bytes = []
+    # Using a rolling IV concept (CBC-like) for better diffusion in both text and image
+    iv = sum(key_bytes) % 256
+    prev = iv
+    
+    for i, b in enumerate(data_bytes):
+        k = key_bytes[i % len(key_bytes)]
+        # Mix: (Byte XOR Key XOR Previous_Cipher) -> Sbox
+        # This ensures high diffusion
+        mixed = b ^ k ^ prev
+        c = sbox[mixed]
+        enc_bytes.append(c)
+        prev = c # Chain the ciphertext
+        
+    return enc_bytes
+
+def decrypt_bytes(enc_bytes, key_string, inv_sbox):
+    """Generic Decryption Logic"""
+    key_bytes = [ord(k) for k in key_string]
+    if len(key_bytes) == 0: return enc_bytes
+    
+    dec_bytes = []
+    iv = sum(key_bytes) % 256
+    prev = iv
+    
+    for i, c in enumerate(enc_bytes):
+        k = key_bytes[i % len(key_bytes)]
+        # Reverse: InvSbox[Cipher] XOR Key XOR Previous_Cipher
+        p_mixed = inv_sbox[c]
+        p = p_mixed ^ k ^ prev
+        dec_bytes.append(p)
+        prev = c # Use the CIPHERTEXT from this round as prev for next
+        
+    return dec_bytes
+
+# ==========================================
+# 5. STREAMLIT UI
 # ==========================================
 
 st.set_page_config(page_title="AES S-Box Research Tool", layout="wide", page_icon="🔐")
 
 st.title("🔐 AES S-Box Research & Deployment Tool")
 st.markdown("""
-This tool allows you to explore the **Affine Matrix modifications** proposed in the research paper.
-You can analyze cryptographic strength, compare matrices, and test real encryption scenarios.
+Explore the custom affine matrices, validate their cryptographic strength, and test **Real-World Encryption**.
 """)
 
 # --- SIDEBAR ---
@@ -199,138 +240,137 @@ df_all = pd.DataFrame(all_metrics).set_index("Name")
 current_sbox, current_inv = sbox_db[selected_matrix_name]
 
 # --- SECTION 1: S-BOX VISUALIZATION ---
-st.header(f"1. S-Box Structure: {selected_matrix_name}")
-col1, col2 = st.columns(2)
-
-with col1:
-    st.subheader("Decimal Table")
-    grid_dec = pd.DataFrame(np.array(current_sbox).reshape(16, 16))
-    st.dataframe(grid_dec, height=250, use_container_width=True)
-
-with col2:
-    st.subheader("Hexadecimal Table")
-    hex_grid = [[f"{val:02X}" for val in row] for row in np.array(current_sbox).reshape(16, 16)]
-    grid_hex = pd.DataFrame(hex_grid)
-    st.dataframe(grid_hex, height=250, use_container_width=True)
+with st.expander("Show S-Box Matrix Details", expanded=False):
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("Decimal Table")
+        grid_dec = pd.DataFrame(np.array(current_sbox).reshape(16, 16))
+        st.dataframe(grid_dec, height=250, use_container_width=True)
+    with col2:
+        st.subheader("Hexadecimal Table")
+        hex_grid = [[f"{val:02X}" for val in row] for row in np.array(current_sbox).reshape(16, 16)]
+        grid_hex = pd.DataFrame(hex_grid)
+        st.dataframe(grid_hex, height=250, use_container_width=True)
 
 # --- SECTION 2: METRICS & COMPARISON ---
-st.header("2. Cryptographic Strength & Comparison")
-
-st.info("""
-**💡 Guide to Metrics:**
-* **NL (Nonlinearity):** Higher is Better (Max 112). Resists linear attacks.
-* **SAC (Strict Avalanche):** Closer to 0.5 is Better. Flip 1 bit -> 50% output change.
-* **DAP (Diff Approx):** Lower is Better. Resists differential attacks.
-* **S-Value:** Lower is Better. Combined score of SAC & BIC deviations.
-""")
+st.header("1. Cryptographic Strength")
 
 # S-Value Calculation
 df_all["S-Value"] = (abs(df_all["SAC"] - 0.5) + abs(df_all["BIC-SAC"] - 0.5)) / 2
-
-# Highlight Table
-st.dataframe(
-    df_all.style.highlight_max(subset=["NL", "AD"], color='#d4edda')
-          .highlight_min(subset=["LAP", "DAP", "S-Value"], color='#d4edda')
-          .format("{:.5f}", subset=["SAC", "BIC-NL", "BIC-SAC", "LAP", "DAP", "TO", "S-Value"]),
-    use_container_width=True
-)
-
-# Comparison Snippet
 best_name = df_all.drop("AES Standard")["S-Value"].idxmin()
-st.subheader("⚔️ Comparison: Selected vs. Best Proposed vs. AES")
-comp_cols = ["AES Standard", best_name]
-if selected_matrix_name not in comp_cols:
-    comp_cols.append(selected_matrix_name)
 
-st.table(df_all.loc[comp_cols].T)
+# Comparison Table
+comp_cols = ["AES Standard", best_name]
+if selected_matrix_name not in comp_cols: comp_cols.append(selected_matrix_name)
+
+st.table(df_all.loc[comp_cols][["NL", "SAC", "BIC-SAC", "LAP", "DAP", "S-Value"]].T)
+st.caption(f"*Selected Matrix: {selected_matrix_name}. Best Proposed: {best_name}.*")
+
 
 # --- SECTION 3: DEPLOYMENT DEMOS ---
-st.header("3. Real-time Encryption Demo")
+st.header("2. Deployment: Encryption & Decryption")
 
-tab_text, tab_image = st.tabs(["🔤 Text Encryption", "🖼️ Image Encryption"])
+tab_text, tab_image = st.tabs(["🔤 Text Tool", "🖼️ Image Tool (Color Support)"])
 
+# --- TEXT TOOL ---
 with tab_text:
-    col_t1, col_t2 = st.columns(2)
-    with col_t1:
-        txt_input = st.text_area("Input Text", "Research Project: AES S-box 2025")
-        key_input_t = st.text_input("Secret Key (Text)", "MYSECRETKEY", type="password")
+    st.subheader("Text Cryptography")
     
-    if st.button("Encrypt Text"):
-        if not key_input_t:
-            st.error("Key is required!")
-        else:
-            # Encrypt
-            key_bytes = [ord(k) for k in key_input_t]
-            plain_bytes = [ord(c) for c in txt_input]
-            enc_bytes = []
-            for i, b in enumerate(plain_bytes):
-                k = key_bytes[i % len(key_bytes)]
-                # Cipher = Sbox[ Plain XOR Key ]
-                enc_bytes.append(current_sbox[b ^ k])
+    op_mode = st.radio("Operation Mode", ["Encrypt Text", "Decrypt Text"], horizontal=True)
+    
+    if op_mode == "Encrypt Text":
+        col_t1, col_t2 = st.columns(2)
+        with col_t1:
+            txt_input = st.text_area("Enter Plaintext", "Research Project: AES S-box 2025")
+            key_enc = st.text_input("Secret Key", "MYSECRETKEY", type="password", key="k_enc")
             
-            b64_res = base64.b64encode(bytes(enc_bytes)).decode()
-            
-            # Decrypt check
-            dec_bytes_raw = base64.b64decode(b64_res)
-            dec_chars = []
-            for i, b in enumerate(dec_bytes_raw):
-                k = key_bytes[i % len(key_bytes)]
-                # Plain = InvSbox[Cipher] XOR Key
-                dec_chars.append(chr(current_inv[b] ^ k))
-            
-            with col_t2:
-                st.success("Encryption Successful")
-                st.code(b64_res, language="text")
-                st.info(f"Decrypted Verification: {''.join(dec_chars)}")
+            if st.button("Encrypt"):
+                if not key_enc:
+                    st.error("Key is required!")
+                else:
+                    data = [ord(c) for c in txt_input]
+                    res = encrypt_bytes(data, key_enc, current_sbox)
+                    b64_res = base64.b64encode(bytes(res)).decode()
+                    st.session_state['last_cipher'] = b64_res
+                    
+        with col_t2:
+            st.info("Result (Base64)")
+            if 'last_cipher' in st.session_state:
+                st.code(st.session_state['last_cipher'], language="text")
 
+    elif op_mode == "Decrypt Text":
+        col_t1, col_t2 = st.columns(2)
+        with col_t1:
+            cipher_input = st.text_area("Enter Encrypted Text (Base64)", "")
+            key_dec = st.text_input("Secret Key", "MYSECRETKEY", type="password", key="k_dec")
+            
+            if st.button("Decrypt"):
+                if not key_dec:
+                    st.error("Key is required!")
+                else:
+                    try:
+                        raw_bytes = base64.b64decode(cipher_input)
+                        res_bytes = decrypt_bytes(raw_bytes, key_dec, current_inv)
+                        res_text = "".join([chr(c) for c in res_bytes])
+                        st.session_state['last_plain'] = res_text
+                    except Exception as e:
+                        st.error(f"Decryption error: {e}")
+                        
+        with col_t2:
+            st.success("Decrypted Message")
+            if 'last_plain' in st.session_state:
+                st.write(st.session_state['last_plain'])
+
+# --- IMAGE TOOL ---
 with tab_image:
-    st.write("Using **CBC Mode** (Cipher Block Chaining) to ensure histogram balancing.")
-    img_file = st.file_uploader("Upload Image (JPG/PNG)", type=["png", "jpg", "jpeg"])
-    key_input_i = st.text_input("Secret Key (Image)", "MYSECRETKEY", type="password")
+    st.subheader("Image Cryptography (Full Color Support)")
+    img_op = st.radio("Image Operation", ["Encrypt Image", "Decrypt Image"], horizontal=True)
     
-    if img_file and key_input_i:
-        image = Image.open(img_file).convert('L').resize((256, 256))
-        st.image(image, caption="Original Image", width=256)
+    if img_op == "Encrypt Image":
+        img_file = st.file_uploader("Upload Original Image", type=["png", "jpg", "jpeg"])
+        key_img_enc = st.text_input("Encryption Key", "MYSECRETKEY", type="password", key="k_img_enc")
         
-        if st.button("Process Image"):
-            img_arr = np.array(image)
-            flat_pixels = img_arr.flatten()
-            key_bytes = [ord(k) for k in key_input_i]
-            iv = sum(key_bytes) % 256
+        if img_file and key_img_enc:
+            image = Image.open(img_file).convert("RGB") # Ensure RGB
+            st.image(image, caption="Original", width=300)
             
-            # Encrypt (CBC)
-            enc_pixels = []
-            prev = iv
-            for p in flat_pixels:
-                c = current_sbox[p ^ prev]
-                enc_pixels.append(c)
-                prev = c
+            if st.button("Encrypt Image"):
+                # Process
+                img_arr = np.array(image) # (H, W, 3)
+                shape = img_arr.shape
+                flat_pixels = img_arr.flatten() # Flatten R,G,B sequence
+                
+                # Encrypt flattened bytes
+                enc_pixels = encrypt_bytes(flat_pixels, key_img_enc, current_sbox)
+                
+                enc_arr = np.array(enc_pixels, dtype=np.uint8).reshape(shape)
+                enc_img = Image.fromarray(enc_arr, mode="RGB")
+                
+                st.image(enc_img, caption="Encrypted Image (Noise)", width=300)
+                
+                # Download
+                buf = io.BytesIO()
+                enc_img.save(buf, format="PNG") # PNG required to save exact pixel values
+                st.download_button("Download Encrypted Image", buf.getvalue(), "encrypted_image.png", "image/png")
+                
+    elif img_op == "Decrypt Image":
+        enc_file = st.file_uploader("Upload Encrypted Image (PNG)", type=["png"])
+        key_img_dec = st.text_input("Decryption Key", "MYSECRETKEY", type="password", key="k_img_dec")
+        
+        if enc_file and key_img_dec:
+            # Load as is
+            image_enc = Image.open(enc_file).convert("RGB")
+            st.image(image_enc, caption="Encrypted Input", width=300)
             
-            enc_arr = np.array(enc_pixels, dtype=np.uint8).reshape(img_arr.shape)
-            enc_img = Image.fromarray(enc_arr)
-            
-            # Decrypt
-            dec_pixels = []
-            prev = iv
-            for c in enc_pixels:
-                p = current_inv[c] ^ prev
-                dec_pixels.append(p)
-                prev = c
-            
-            dec_arr = np.array(dec_pixels, dtype=np.uint8).reshape(img_arr.shape)
-            dec_img = Image.fromarray(dec_arr)
-            
-            # Visual Results
-            c1, c2, c3 = st.columns(3)
-            with c1: st.image(image, caption="Original", use_container_width=True)
-            with c2: st.image(enc_img, caption="Encrypted (Noise)", use_container_width=True)
-            with c3: st.image(dec_img, caption="Decrypted", use_container_width=True)
-            
-            # Histograms
-            st.write("### Histogram Analysis")
-            fig, ax = plt.subplots(1, 2, figsize=(10, 3))
-            ax[0].hist(flat_pixels, bins=256, color='blue', alpha=0.7)
-            ax[0].set_title("Original Histogram")
-            ax[1].hist(enc_pixels, bins=256, color='red', alpha=0.7)
-            ax[1].set_title("Encrypted Histogram (Balanced)")
-            st.pyplot(fig)
+            if st.button("Decrypt Image"):
+                img_arr = np.array(image_enc)
+                shape = img_arr.shape
+                flat_pixels = img_arr.flatten()
+                
+                # Decrypt
+                dec_pixels = decrypt_bytes(flat_pixels, key_img_dec, current_inv)
+                
+                dec_arr = np.array(dec_pixels, dtype=np.uint8).reshape(shape)
+                dec_img = Image.fromarray(dec_arr, mode="RGB")
+                
+                st.image(dec_img, caption="Decrypted Result", width=300)
