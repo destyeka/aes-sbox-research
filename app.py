@@ -284,7 +284,7 @@ with tab_analysis:
     # --- STYLING LOGIC ---
     def style_comparison(styler):
         # 1. Highlight Target Column (Blue)
-        styler.set_properties(subset=["Target (Ideal)"], **{'background-color': '#e6f3ff', 'font-weight': 'bold'})
+        styler.set_properties(subset=["Target (Ideal)"], **{'background-color': '#e6f3ff', 'color': 'blue', 'font-weight': 'bold'})
         
         # 2. Highlight Best Value per Row (Green)
         # Iterate over rows
