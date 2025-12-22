@@ -170,22 +170,9 @@ def calculate_metrics(sbox_tuple):
 # ==========================================
 # 4. HELPER FUNCTIONS (CRYPTO & PLOTTING)
 # ==========================================
-def prepare_key_16(key_string):
-    """Ensure key is exactly 16 bytes (128-bit)"""
-    key_bytes = [ord(k) for k in key_string]
-    
-    # If shorter, pad with Zeros
-    if len(key_bytes) < 16:
-        key_bytes += [0] * (16 - len(key_bytes))
-    
-    # If longer, truncate to 16
-    elif len(key_bytes) > 16:
-        key_bytes = key_bytes[:16]
-        
-    return key_bytes
 def encrypt_bytes(data_bytes, key_string, sbox):
-    # key_bytes = [ord(k) for k in key_string]
-    key_bytes = prepare_key_16(key_string)
+    key_bytes = [ord(k) for k in key_string]
+    # key_bytes = prepare_key_16(key_string)
     if len(key_bytes) == 0: return data_bytes 
     
     enc_bytes = []
