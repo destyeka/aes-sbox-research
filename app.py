@@ -318,8 +318,8 @@ with tab_analysis:
 # TAB 2: ENCRYPTION / DECRYPTION DEMOS
 # =========================================================
 with tab_demo:
-    st.header("Real-World Deployment")
-    subtab_text, subtab_image = st.tabs(["🔤 Text Tool", "🖼️ Image Tool (RGB + Histogram)"])
+    st.header("Implemetation")
+    subtab_text, subtab_image = st.tabs(["🔤 Text Tool", "🖼️ Image Tool"])
 
     # --- TEXT TOOL ---
     with subtab_text:
@@ -329,8 +329,8 @@ with tab_demo:
         c1, c2 = st.columns(2)
         if t_mode == "Encrypt":
             with c1:
-                txt_in = st.text_area("Plaintext", "Research Project 2025")
-                k_in = st.text_input("Key", "MYKEY", type="password")
+                txt_in = st.text_area("Plaintext")
+                k_in = st.text_input("Key", type="password")
                 if st.button("Encrypt"):
                     if not k_in: st.error("Key required")
                     else:
