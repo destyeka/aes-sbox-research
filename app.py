@@ -363,7 +363,7 @@ with tab_demo:
         if i_mode == "Encrypt Image":
             st.subheader("Encryption Mode")
             img_file = st.file_uploader("Upload Original Image", type=["png", "jpg", "jpeg"])
-            k_img = st.text_input("Encryption Key", "MYSECRETKEY", type="password", key="kimg_enc")
+            k_img = st.text_input("Encryption Key", type="password", key="kimg_enc")
             
             if img_file and k_img:
                 img_orig = Image.open(img_file).convert("RGB")
