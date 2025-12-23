@@ -187,7 +187,6 @@ def decrypt_bytes(enc_bytes, key_string, inv_sbox):
     return dec_bytes
 
 def calculate_entropy(image_pil):
-    """Calculates Shannon Entropy of an image"""
     img_arr = np.array(image_pil)
     histogram = np.histogram(img_arr, bins=256, range=(0, 256))[0]
     histogram = histogram / histogram.sum()
@@ -209,193 +208,201 @@ def plot_rgb_histogram(image_pil):
     return fig
 
 # ==========================================
-# 5. UI: PAGE FUNCTIONS
+# 5. MAIN UI LAYOUT
 # ==========================================
 
-def render_main_tool():
-    st.title("🔐 AES S-Box Research Laboratory")
-    st.markdown("""
-    **Laboratory Mode:** Modify Affine Matrices, Analyze S-box Strength, and Test Encryption.
-    Based on research: *AES S-box modification uses affine matrices exploration*.
-    """)
+st.set_page_config(page_title="AES S-Box Project", layout="wide", page_icon="🔐")
 
-    # --- SIDEBAR CONFIG (Only for Main Tool) ---
-    st.sidebar.header("⚙️ Configuration")
-    matrix_options = list(K_MATRICES.keys()) + ["🧪 Custom (Laboratory Mode)"]
-    selected_option = st.sidebar.selectbox("Select K-Matrix", matrix_options, index=2)
+st.title("🔐 AES S-Box Research Laboratory")
+st.markdown("""
+**Laboratory Mode:** Modify Affine Matrices, Analyze S-box Strength, and Test Encryption.
+Based on research: *AES S-box modification uses affine matrices exploration*.
+""")
 
-    if selected_option == "🧪 Custom (Laboratory Mode)":
-        st.sidebar.markdown("### Define Affine Matrix")
-        custom_matrix = []
-        default_vals = K_MATRICES["AES Standard"]
-        for i in range(8):
-            val = st.sidebar.number_input(f"Row {i} (0-255)", 0, 255, default_vals[i], key=f"row_{i}")
-            custom_matrix.append(val)
-        current_matrix = custom_matrix
-        selected_matrix_name = "Custom Matrix"
-    else:
-        current_matrix = K_MATRICES[selected_option]
-        selected_matrix_name = selected_option
+# --- SIDEBAR CONFIG ---
+st.sidebar.header("⚙️ Configuration")
+matrix_options = list(K_MATRICES.keys()) + ["🧪 Custom (Laboratory Mode)"]
+selected_option = st.sidebar.selectbox("Select K-Matrix", matrix_options, index=2)
 
-    # Construct S-box
-    current_sbox, current_inv = construct_sbox_dynamic(current_matrix)
+if selected_option == "🧪 Custom (Laboratory Mode)":
+    st.sidebar.markdown("### Define Affine Matrix")
+    custom_matrix = []
+    default_vals = K_MATRICES["AES Standard"]
+    for i in range(8):
+        val = st.sidebar.number_input(f"Row {i} (0-255)", 0, 255, default_vals[i], key=f"row_{i}")
+        custom_matrix.append(val)
+    current_matrix = custom_matrix
+    selected_matrix_name = "Custom Matrix"
+else:
+    current_matrix = K_MATRICES[selected_option]
+    selected_matrix_name = selected_option
 
-    # --- PRE-COMPUTE COMPARISON ---
-    all_metrics = []
-    for name, mat in K_MATRICES.items():
-        sb, _ = construct_sbox_dynamic(mat)
-        m = calculate_metrics(sb)
-        m["Name"] = name
-        all_metrics.append(m)
+# Construct S-box
+current_sbox, current_inv = construct_sbox_dynamic(current_matrix)
 
-    if selected_option == "🧪 Custom (Laboratory Mode)":
-        m_cust = calculate_metrics(current_sbox)
-        m_cust["Name"] = "Custom Matrix"
-        all_metrics.append(m_cust)
+# --- PRE-COMPUTE COMPARISON ---
+all_metrics = []
+for name, mat in K_MATRICES.items():
+    sb, _ = construct_sbox_dynamic(mat)
+    m = calculate_metrics(sb)
+    m["Name"] = name
+    all_metrics.append(m)
 
-    df_all = pd.DataFrame(all_metrics).set_index("Name")
-    df_all["S-Value"] = (abs(df_all["SAC"] - 0.5) + abs(df_all["BIC-SAC"] - 0.5)) / 2
+if selected_option == "🧪 Custom (Laboratory Mode)":
+    m_cust = calculate_metrics(current_sbox)
+    m_cust["Name"] = "Custom Matrix"
+    all_metrics.append(m_cust)
 
-    # --- TABS ---
-    tab_analysis, tab_demo = st.tabs(["📊 S-Box Analysis", "🔐 Encryption & Entropy"])
+df_all = pd.DataFrame(all_metrics).set_index("Name")
+df_all["S-Value"] = (abs(df_all["SAC"] - 0.5) + abs(df_all["BIC-SAC"] - 0.5)) / 2
 
-    # TAB 1: VISUALIZATION & COMPARISON
-    with tab_analysis:
-        st.header(f"1. S-Box Matrix: {selected_matrix_name}")
+# --- TABS LAYOUT ---
+tab_analysis, tab_demo, tab_about = st.tabs(["📊 S-Box Analysis", "🔐 Encryption & Entropy", "ℹ️ About Project"])
+
+# =========================================================
+# TAB 1: S-BOX VISUALIZATION & COMPARISON
+# =========================================================
+with tab_analysis:
+    st.header(f"1. S-Box Matrix: {selected_matrix_name}")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.caption("Decimal Representation")
+        st.dataframe(pd.DataFrame(np.array(current_sbox).reshape(16, 16)), height=250)
+    with c2:
+        st.caption("Hexadecimal Representation")
+        st.dataframe(pd.DataFrame([[f"{x:02X}" for x in r] for r in np.array(current_sbox).reshape(16, 16)]), height=250)
+
+    st.divider()
+    st.header("2. Strength Comparison")
+    
+    targets = {
+        "NL": "Max (112)", "SAC": "0.5", "BIC-NL": "High", "BIC-SAC": "0.5",
+        "LAP": "Min (0)", "DAP": "Min (0)", "DU": "Min (4)", "AD": "Max (7)", "S-Value": "Min (0)"
+    }
+    
+    cols = ["AES Standard"]
+    if "K-44 (Prop)" in df_all.index: cols.append("K-44 (Prop)")
+    if selected_matrix_name not in cols: cols.append(selected_matrix_name)
+    
+    comp_df = df_all.loc[cols].T
+    comp_df["Target (Ideal)"] = [targets.get(i, "-") for i in comp_df.index]
+    
+    def style_comparison(styler):
+        styler.set_properties(subset=["Target (Ideal)"], **{'background-color': '#e6f3ff', 'font-weight': 'bold'})
+        for idx in styler.index:
+            data_cols = [c for c in styler.columns if c != "Target (Ideal)"]
+            row_vals = styler.data.loc[idx, data_cols]
+            best_val = None
+            if idx in ["NL", "AD", "BIC-NL"]: best_val = row_vals.max()
+            elif idx in ["SAC", "BIC-SAC"]:   best_val = row_vals.iloc[(row_vals - 0.5).abs().argmin()]
+            else:                             best_val = row_vals.min()
+            
+            for col in data_cols:
+                if row_vals[col] == best_val:
+                    styler.set_properties(subset=pd.IndexSlice[idx, col], **{'background-color': '#d4edda', 'color': 'green', 'font-weight': 'bold'})
+        return styler
+
+    st.table(style_comparison(comp_df.style.format("{:.5f}", subset=cols)))
+
+# =========================================================
+# TAB 2: ENCRYPTION
+# =========================================================
+with tab_demo:
+    st.header("Real-World Deployment")
+    subtab_text, subtab_image = st.tabs(["🔤 Text Tool", "🖼️ Image Laboratory"])
+
+    with subtab_text:
+        st.markdown("### Text Cryptography")
+        t_mode = st.radio("Mode", ["Encrypt", "Decrypt"], horizontal=True)
         c1, c2 = st.columns(2)
-        with c1:
-            st.caption("Decimal Representation")
-            st.dataframe(pd.DataFrame(np.array(current_sbox).reshape(16, 16)), height=250)
-        with c2:
-            st.caption("Hexadecimal Representation")
-            st.dataframe(pd.DataFrame([[f"{x:02X}" for x in r] for r in np.array(current_sbox).reshape(16, 16)]), height=250)
-
-        st.divider()
-        st.header("2. Strength Comparison")
         
-        targets = {
-            "NL": "Max (112)", "SAC": "0.5", "BIC-NL": "High", "BIC-SAC": "0.5",
-            "LAP": "Min (0)", "DAP": "Min (0)", "DU": "Min (4)", "AD": "Max (7)", "S-Value": "Min (0)"
-        }
-        
-        cols = ["AES Standard"]
-        if "K-44 (Prop)" in df_all.index: cols.append("K-44 (Prop)")
-        if selected_matrix_name not in cols: cols.append(selected_matrix_name)
-        
-        comp_df = df_all.loc[cols].T
-        comp_df["Target (Ideal)"] = [targets.get(i, "-") for i in comp_df.index]
-        
-        def style_comparison(styler):
-            styler.set_properties(subset=["Target (Ideal)"], **{'background-color': '#e6f3ff', 'font-weight': 'bold'})
-            for idx in styler.index:
-                data_cols = [c for c in styler.columns if c != "Target (Ideal)"]
-                row_vals = styler.data.loc[idx, data_cols]
-                best_val = None
-                if idx in ["NL", "AD", "BIC-NL"]: best_val = row_vals.max()
-                elif idx in ["SAC", "BIC-SAC"]:   best_val = row_vals.iloc[(row_vals - 0.5).abs().argmin()]
-                else:                             best_val = row_vals.min()
-                
-                for col in data_cols:
-                    if row_vals[col] == best_val:
-                        styler.set_properties(subset=pd.IndexSlice[idx, col], **{'background-color': '#d4edda', 'color': 'green', 'font-weight': 'bold'})
-            return styler
+        if t_mode == "Encrypt":
+            with c1:
+                txt_in = st.text_area("Plaintext", "Research Project 2025")
+                k_in = st.text_input("Key", "MYKEY", type="password")
+                if st.button("Encrypt"):
+                    if not k_in: st.error("Key required")
+                    else:
+                        enc = encrypt_bytes([ord(c) for c in txt_in], k_in, current_sbox)
+                        st.session_state['res_txt'] = base64.b64encode(bytes(enc)).decode()
+            with c2:
+                st.info("Encrypted (Base64)")
+                if 'res_txt' in st.session_state: st.code(st.session_state['res_txt'])
+        else:
+            with c1:
+                c_in = st.text_area("Ciphertext", "")
+                k_in = st.text_input("Key", "MYKEY", type="password", key="kd")
+                if st.button("Decrypt"):
+                    if not k_in: st.error("Key required")
+                    else:
+                        try:
+                            dec = decrypt_bytes(base64.b64decode(c_in), k_in, current_inv)
+                            st.session_state['res_pln'] = "".join([chr(c) for c in dec])
+                        except: st.error("Error")
+            with c2:
+                st.success("Decrypted")
+                if 'res_pln' in st.session_state: st.write(st.session_state['res_pln'])
 
-        st.table(style_comparison(comp_df.style.format("{:.5f}", subset=cols)))
-
-    # TAB 2: ENCRYPTION
-    with tab_demo:
-        st.header("Real-World Deployment")
-        subtab_text, subtab_image = st.tabs(["🔤 Text Tool", "🖼️ Image Laboratory"])
-
-        with subtab_text:
-            st.markdown("### Text Cryptography")
-            t_mode = st.radio("Mode", ["Encrypt", "Decrypt"], horizontal=True)
-            c1, c2 = st.columns(2)
+    with subtab_image:
+        st.markdown("### Image Cryptography & Entropy Analysis")
+        i_mode = st.radio("Image Operation", ["Encrypt Image", "Decrypt Image"], horizontal=True)
+        
+        if i_mode == "Encrypt Image":
+            img_file = st.file_uploader("Upload Original", type=["png", "jpg", "jpeg"])
+            k_img = st.text_input("Key", "MYSECRETKEY", type="password", key="kimg_enc")
             
-            if t_mode == "Encrypt":
-                with c1:
-                    txt_in = st.text_area("Plaintext", "Research Project 2025")
-                    k_in = st.text_input("Key", "MYKEY", type="password")
-                    if st.button("Encrypt"):
-                        if not k_in: st.error("Key required")
-                        else:
-                            enc = encrypt_bytes([ord(c) for c in txt_in], k_in, current_sbox)
-                            st.session_state['res_txt'] = base64.b64encode(bytes(enc)).decode()
-                with c2:
-                    st.info("Encrypted (Base64)")
-                    if 'res_txt' in st.session_state: st.code(st.session_state['res_txt'])
-            else:
-                with c1:
-                    c_in = st.text_area("Ciphertext", "")
-                    k_in = st.text_input("Key", "MYKEY", type="password", key="kd")
-                    if st.button("Decrypt"):
-                        if not k_in: st.error("Key required")
-                        else:
-                            try:
-                                dec = decrypt_bytes(base64.b64decode(c_in), k_in, current_inv)
-                                st.session_state['res_pln'] = "".join([chr(c) for c in dec])
-                            except: st.error("Error")
-                with c2:
-                    st.success("Decrypted")
-                    if 'res_pln' in st.session_state: st.write(st.session_state['res_pln'])
+            if img_file and k_img:
+                img_orig = Image.open(img_file).convert("RGB")
+                if st.button("Encrypt & Analyze"):
+                    arr = np.array(img_orig)
+                    shape = arr.shape
+                    enc_bytes = encrypt_bytes(arr.flatten(), k_img, current_sbox)
+                    img_enc = Image.fromarray(np.array(enc_bytes, dtype=np.uint8).reshape(shape), "RGB")
+                    
+                    ent_orig = calculate_entropy(img_orig)
+                    ent_enc = calculate_entropy(img_enc)
+                    
+                    c_l, c_r = st.columns(2)
+                    with c_l:
+                        st.image(img_orig, caption=f"Original (Entropy: {ent_orig:.4f})", use_container_width=True)
+                        st.pyplot(plot_rgb_histogram(img_orig))
+                    with c_r:
+                        st.image(img_enc, caption=f"Encrypted (Entropy: {ent_enc:.4f})", use_container_width=True)
+                        st.pyplot(plot_rgb_histogram(img_enc))
+                    
+                    st.success(f"**Entropy Analysis:** Original `{ent_orig:.4f}` → Encrypted `{ent_enc:.4f}`. (Closer to 8.0 is better)")
+                    
+                    buf = io.BytesIO()
+                    img_enc.save(buf, format="PNG")
+                    st.download_button("Download Encrypted PNG", buf.getvalue(), "encrypted.png", "image/png")
 
-        with subtab_image:
-            st.markdown("### Image Cryptography & Entropy Analysis")
-            i_mode = st.radio("Image Operation", ["Encrypt Image", "Decrypt Image"], horizontal=True)
-            
-            if i_mode == "Encrypt Image":
-                img_file = st.file_uploader("Upload Original", type=["png", "jpg", "jpeg"])
-                k_img = st.text_input("Key", "MYSECRETKEY", type="password", key="kimg_enc")
-                
-                if img_file and k_img:
-                    img_orig = Image.open(img_file).convert("RGB")
-                    if st.button("Encrypt & Analyze"):
-                        arr = np.array(img_orig)
-                        shape = arr.shape
-                        enc_bytes = encrypt_bytes(arr.flatten(), k_img, current_sbox)
-                        img_enc = Image.fromarray(np.array(enc_bytes, dtype=np.uint8).reshape(shape), "RGB")
-                        
-                        ent_orig = calculate_entropy(img_orig)
-                        ent_enc = calculate_entropy(img_enc)
-                        
-                        c_l, c_r = st.columns(2)
-                        with c_l:
-                            st.image(img_orig, caption=f"Original (Entropy: {ent_orig:.4f})", use_container_width=True)
-                            st.pyplot(plot_rgb_histogram(img_orig))
-                        with c_r:
-                            st.image(img_enc, caption=f"Encrypted (Entropy: {ent_enc:.4f})", use_container_width=True)
-                            st.pyplot(plot_rgb_histogram(img_enc))
-                        
-                        st.success(f"**Entropy Analysis:** Original `{ent_orig:.4f}` → Encrypted `{ent_enc:.4f}`. (Closer to 8.0 is better)")
-                        
-                        buf = io.BytesIO()
-                        img_enc.save(buf, format="PNG")
-                        st.download_button("Download Encrypted PNG", buf.getvalue(), "encrypted.png", "image/png")
+        else: 
+            enc_file = st.file_uploader("Upload Encrypted PNG", type=["png"])
+            k_img_d = st.text_input("Key", "MYSECRETKEY", type="password", key="kimg_dec")
+            if enc_file and k_img_d:
+                img_enc = Image.open(enc_file).convert("RGB")
+                if st.button("Decrypt & Analyze"):
+                    arr = np.array(img_enc)
+                    shape = arr.shape
+                    dec_bytes = decrypt_bytes(arr.flatten(), k_img_d, current_inv)
+                    img_dec = Image.fromarray(np.array(dec_bytes, dtype=np.uint8).reshape(shape), "RGB")
+                    
+                    c_l, c_r = st.columns(2)
+                    with c_l:
+                        st.image(img_enc, caption="Encrypted Input", use_container_width=True)
+                        st.pyplot(plot_rgb_histogram(img_enc))
+                    with c_r:
+                        st.image(img_dec, caption="Decrypted Result", use_container_width=True)
+                        st.pyplot(plot_rgb_histogram(img_dec))
+                    
+                    buf = io.BytesIO()
+                    img_dec.save(buf, format="PNG")
+                    st.download_button("Download Decrypted PNG", buf.getvalue(), "decrypted.png", "image/png")
 
-            else: 
-                enc_file = st.file_uploader("Upload Encrypted PNG", type=["png"])
-                k_img_d = st.text_input("Key", "MYSECRETKEY", type="password", key="kimg_dec")
-                if enc_file and k_img_d:
-                    img_enc = Image.open(enc_file).convert("RGB")
-                    if st.button("Decrypt & Analyze"):
-                        arr = np.array(img_enc)
-                        shape = arr.shape
-                        dec_bytes = decrypt_bytes(arr.flatten(), k_img_d, current_inv)
-                        img_dec = Image.fromarray(np.array(dec_bytes, dtype=np.uint8).reshape(shape), "RGB")
-                        
-                        c_l, c_r = st.columns(2)
-                        with c_l:
-                            st.image(img_enc, caption="Encrypted Input", use_container_width=True)
-                            st.pyplot(plot_rgb_histogram(img_enc))
-                        with c_r:
-                            st.image(img_dec, caption="Decrypted Result", use_container_width=True)
-                            st.pyplot(plot_rgb_histogram(img_dec))
-                        
-                        buf = io.BytesIO()
-                        img_dec.save(buf, format="PNG")
-                        st.download_button("Download Decrypted PNG", buf.getvalue(), "decrypted.png", "image/png")
-
-def render_about_page():
+# =========================================================
+# TAB 3: ABOUT PAGE
+# =========================================================
+with tab_about:
     st.title("ℹ️ About the Project")
 
     st.header("Project Title")
@@ -420,25 +427,23 @@ def render_about_page():
     
     st.header("Our Team")
     
-        possible_files = ["project_photo.png", "project_photo.jpg", "project_photo.jpeg", "project_photo.JPG"]
-        found_file = None
+    possible_files = ["project_photo.png", "project_photo.jpg", "project_photo.jpeg", "project_photo.JPG"]
+    found_file = None
     
-        for f in possible_files:
-            if os.path.exists(f):
-                found_file = f
-                break
-                
-        if found_file:
-            try:
-                image = Image.open(found_file)
-                image = image.rotate(90, expand=True) 
-
-                st.image(image, caption="Project Team / Research Group", width=350)
-    
-            except Exception as e:
-                st.warning(f"⚠️ Found '{found_file}' but could not load it. Error: {e}")
-        else:
-            st.info("📷 **Tip:** To display a photo here, upload a file named `project_photo.png` or `project_photo.jpg` to your repository.")
+    for f in possible_files:
+        if os.path.exists(f):
+            found_file = f
+            break
+            
+    if found_file:
+        try:
+            image = Image.open(found_file)
+            image = image.rotate(90, expand=True) 
+            st.image(image, caption="Project Team / Research Group", width=350)
+        except Exception as e:
+            st.warning(f"⚠️ Found '{found_file}' but could not load it. Error: {e}")
+    else:
+        st.info("📷 **Tip:** To display a photo here, upload a file named `project_photo.png` or `project_photo.jpg` to your repository.")
     
     col1, col2, col3, col4 = st.columns(4)
         
@@ -470,18 +475,3 @@ def render_about_page():
     st.markdown("""
     1. Alamsyah et al. (2025). *AES S-box modification uses affine matrices exploration for increased S-box strength*. Nonlinear Dynamics.
     """)
-# ==========================================
-# 6. MAIN APP LOGIC
-# ==========================================
-
-st.set_page_config(page_title="AES S-Box Project", layout="wide", page_icon="🔐")
-
-# --- NAVIGATION ---
-# Position at bottom of sidebar
-st.sidebar.markdown("---")
-page_selection = st.sidebar.radio("Navigate", ["🛠️ Main Tool", "ℹ️ About Project"])
-
-if page_selection == "🛠️ Main Tool":
-    render_main_tool()
-else:
-    render_about_page()
