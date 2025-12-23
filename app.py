@@ -398,14 +398,41 @@ def render_main_tool():
 def render_about_page():
     st.title("ℹ️ About the Project")
     
-    # --- ADDED PHOTO SECTION ---
-    # Attempts to load a local file named "project_photo.png" or displays a placeholder tip
-    if os.path.exists("project_photo.jpg"):
-        image = Image.open(found_file)
-        image = image.rotate(-90, expand=True)
-        st.image(image, caption="Project Team / Research Group", use_container_width=True, width=350)
+    # --- ROBUST PHOTO SECTION WITH MODIFICATIONS ---
+    # 1. List of acceptable filenames
+    possible_files = ["project_photo.png", "project_photo.jpg", "project_photo.jpeg", "project_photo.JPG"]
+    found_file = None
+
+    # 2. Find the first file that actually exists
+    for f in possible_files:
+        if os.path.exists(f):
+            found_file = f
+            break
+    
+    # 3. Try to open, modify, and display it safely
+    if found_file:
+        try:
+            image = Image.open(found_file)
+
+            # --- MODIFICATIONS START ---
+            
+            # A. ROTATE: Change the '-90' value to rotate differently.
+            # 90 = counter-clockwise, -90 = clockwise, 180 = upside down.
+            # expand=True ensures the whole image fits after rotation.
+            image = image.rotate(-90, expand=True) 
+
+            # B. DISPLAY SMALLER:
+            # Removed 'use_container_width=True'
+            # Added 'width=350' (Change this pixel value to make it bigger/smaller)
+            st.image(image, caption="Project Team / Research Group", width=350)
+            
+            # --- MODIFICATIONS END ---
+
+        except Exception as e:
+            st.warning(f"⚠️ Found '{found_file}' but could not load it. Error: {e}")
+            st.info("Tip: Please check that the file is not corrupted and is a valid PNG or JPG image.")
     else:
-        st.info("📷 **Tip:** To display a Team/University photo here, rename your image file to `project_photo.png` and upload it to the same folder as this script.")
+        st.info("📷 **Tip:** To display a photo here, upload a file named `project_photo.png` or `project_photo.jpg` to your repository.")
 
     st.header("Project Title")
     st.markdown("""
@@ -418,38 +445,33 @@ def render_about_page():
     by replacing its standard S-box with a new one derived from an optimized Affine Matrix.
     
     **Methodology:**
-    1. [cite_start]**Exploration:** Analyzed $2^{64}$ possible affine matrices[cite: 132, 1942].
-    2. [cite_start]**Construction:** Generated candidate S-boxes using the irreducible polynomial $x^8 + x^4 + x^3 + x + 1$[cite: 39, 1191].
-    3. [cite_start]**Validation:** Screened candidates for Bijectivity and Balance[cite: 433, 1957].
-    4. [cite_start]**Testing:** Selected the best candidate ($S-box_{44}$) based on SAC, BIC, and Nonlinearity metrics [cite: 1376-1385].
+    1. **Exploration:** Analyzed $2^{64}$ possible affine matrices.
+    2. **Construction:** Generated candidate S-boxes using the irreducible polynomial $x^8 + x^4 + x^3 + x + 1$.
+    3. **Validation:** Screened candidates for Bijectivity and Balance.
+    4. **Testing:** Selected the best candidate ($S-box_{44}$) based on SAC, BIC, and Nonlinearity metrics.
     
     **Key Finding:** The proposed **$S-box_{44}$** achieves a Strict Avalanche Criterion (SAC) of **0.50073**, 
-    [cite_start]which is closer to the ideal 0.5 than the standard AES S-box (0.50488)[cite: 1322, 1644].
+    which is closer to the ideal 0.5 than the standard AES S-box (0.50488).
     """)
     
     st.header("Our Team")
-    # [cite_start]Data from [cite: 1843]
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.markdown("**Ara Bela Zulfa Laila**")
-        st.caption("2304130050")
+        st.markdown("**Muhammad Mishbakhuz Zuhail**")
+        st.caption("2304130064")
     
     with col2:
-        st.markdown("**Khumaerotu Zahra**")
-        st.caption("2304130072")
+        st.markdown("**Ahmad Muzakki Ahsan**")
+        st.caption("2304130079")
         
     with col3:
-        st.markdown("**Desty Eka Syawfitri**")
-        st.caption("2304130073")
-    
-    with col4:
-        st.markdown("**Nabilla Marsha Amanda Putri**")
-        st.caption("2304130081")
+        st.markdown("**Sheva Aqila Ramadhan**")
+        st.caption("2304130083")
         
     st.divider()
     st.markdown("""
-    Department of Computer Science  
+    **Institution:** Department of Informatics Engineering  
     Faculty of Mathematics and Natural Sciences  
     **Universitas Negeri Semarang (UNNES)** 2025
     """)
@@ -458,7 +480,6 @@ def render_about_page():
     st.markdown("""
     1. Alamsyah et al. (2025). *AES S-box modification uses affine matrices exploration for increased S-box strength*. Nonlinear Dynamics.
     """)
-
 # ==========================================
 # 6. MAIN APP LOGIC
 # ==========================================
