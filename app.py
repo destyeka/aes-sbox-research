@@ -400,8 +400,8 @@ def render_about_page():
     
     # --- ADDED PHOTO SECTION ---
     # Attempts to load a local file named "project_photo.png" or displays a placeholder tip
-    if os.path.exists("project_photo.JPG"):
-        st.image("project_photo.JPG", caption="Project Team / Research Group", use_container_width=True)
+    if os.path.exists("project_photo.jpg"):
+        st.image("project_photo.jpg", caption="Project Team / Research Group", use_container_width=True)
     else:
         st.info("📷 **Tip:** To display a Team/University photo here, rename your image file to `project_photo.png` and upload it to the same folder as this script.")
 
