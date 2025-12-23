@@ -213,10 +213,10 @@ def plot_rgb_histogram(image_pil):
 
 st.set_page_config(page_title="AES S-Box Project", layout="wide", page_icon="🔐")
 
-st.title("🔐 AES S-Box Research Laboratory")
+st.title("🔐 AES S-Box Research")
 st.markdown("""
-**Laboratory Mode:** Modify Affine Matrices, Analyze S-box Strength, and Test Encryption.
-Based on research: *AES S-box modification uses affine matrices exploration*.
+Modify Affine Matrices, Analyze S-box Strength, and Test Encryption.
+Based on research: *AES S-box modification uses affine matrices exploration fo increased S-Box Strength*.
 """)
 
 # --- SIDEBAR CONFIG ---
