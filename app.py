@@ -397,7 +397,29 @@ def render_main_tool():
 
 def render_about_page():
     st.title("ℹ️ About the Project")
+
+    st.header("Project Title")
+    st.markdown("""
+    **AES S-box modification uses affine matrices exploration for increased S-box strength**
+    """)
     
+    st.header("Research Summary")
+    st.info("""
+    This research focuses on enhancing the cryptographic strength of the Advanced Encryption Standard (AES) 
+    by replacing its standard S-box with a new one derived from an optimized Affine Matrix.
+    
+    **Methodology:**
+    1. **Exploration:** Analyzed $2^{64}$ possible affine matrices.
+    2. **Construction:** Generated candidate S-boxes using the irreducible polynomial $x^8 + x^4 + x^3 + x + 1$.
+    3. **Validation:** Screened candidates for Bijectivity and Balance.
+    4. **Testing:** Selected the best candidate ($S-box_{44}$) based on SAC, BIC, and Nonlinearity metrics.
+    
+    **Key Finding:** The proposed **$S-box_{44}$** achieves a Strict Avalanche Criterion (SAC) of **0.50073**, 
+    which is closer to the ideal 0.5 than the standard AES S-box (0.50488).
+    """)
+    
+    st.header("Our Team")
+
     # --- ROBUST PHOTO SECTION WITH MODIFICATIONS ---
     # 1. List of acceptable filenames
     possible_files = ["project_photo.png", "project_photo.jpg", "project_photo.jpeg", "project_photo.JPG"]
@@ -433,28 +455,7 @@ def render_about_page():
             st.info("Tip: Please check that the file is not corrupted and is a valid PNG or JPG image.")
     else:
         st.info("📷 **Tip:** To display a photo here, upload a file named `project_photo.png` or `project_photo.jpg` to your repository.")
-
-    st.header("Project Title")
-    st.markdown("""
-    **AES S-box modification uses affine matrices exploration for increased S-box strength**
-    """)
-    
-    st.header("Research Summary")
-    st.info("""
-    This research focuses on enhancing the cryptographic strength of the Advanced Encryption Standard (AES) 
-    by replacing its standard S-box with a new one derived from an optimized Affine Matrix.
-    
-    **Methodology:**
-    1. **Exploration:** Analyzed $2^{64}$ possible affine matrices.
-    2. **Construction:** Generated candidate S-boxes using the irreducible polynomial $x^8 + x^4 + x^3 + x + 1$.
-    3. **Validation:** Screened candidates for Bijectivity and Balance.
-    4. **Testing:** Selected the best candidate ($S-box_{44}$) based on SAC, BIC, and Nonlinearity metrics.
-    
-    **Key Finding:** The proposed **$S-box_{44}$** achieves a Strict Avalanche Criterion (SAC) of **0.50073**, 
-    which is closer to the ideal 0.5 than the standard AES S-box (0.50488).
-    """)
-    
-    st.header("Our Team")
+        
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
@@ -475,7 +476,8 @@ def render_about_page():
         
     st.divider()
     st.markdown("""
-    **Institution:** Department of Informatics Engineering  
+    Informatics Engineering
+    Department of Computer Science  
     Faculty of Mathematics and Natural Sciences  
     **Universitas Negeri Semarang (UNNES)** 2025
     """)
