@@ -419,58 +419,58 @@ def render_about_page():
     """)
     
     st.header("Our Team")
-
-    # --- ROBUST PHOTO SECTION WITH MODIFICATIONS ---
-    # 1. List of acceptable filenames
-    possible_files = ["project_photo.png", "project_photo.jpg", "project_photo.jpeg", "project_photo.JPG"]
-    found_file = None
-
-    # 2. Find the first file that actually exists
-    for f in possible_files:
-        if os.path.exists(f):
-            found_file = f
-            break
-    
-    # 3. Try to open, modify, and display it safely
-    if found_file:
-        try:
-            image = Image.open(found_file)
-
-            # --- MODIFICATIONS START ---
-            
-            # A. ROTATE: Change the '-90' value to rotate differently.
-            # 90 = counter-clockwise, -90 = clockwise, 180 = upside down.
-            # expand=True ensures the whole image fits after rotation.
-            image = image.rotate(90, expand=True) 
-
-            # B. DISPLAY SMALLER:
-            # Removed 'use_container_width=True'
-            # Added 'width=350' (Change this pixel value to make it bigger/smaller)
-            st.image(image, caption="Project Team / Research Group", width=350)
-            
-            # --- MODIFICATIONS END ---
-
-        except Exception as e:
-            st.warning(f"⚠️ Found '{found_file}' but could not load it. Error: {e}")
-            st.info("Tip: Please check that the file is not corrupted and is a valid PNG or JPG image.")
-    else:
-        st.info("📷 **Tip:** To display a photo here, upload a file named `project_photo.png` or `project_photo.jpg` to your repository.")
-        
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     
     with col1:
+        # --- ROBUST PHOTO SECTION WITH MODIFICATIONS ---
+        # 1. List of acceptable filenames
+        possible_files = ["project_photo.png", "project_photo.jpg", "project_photo.jpeg", "project_photo.JPG"]
+        found_file = None
+    
+        # 2. Find the first file that actually exists
+        for f in possible_files:
+            if os.path.exists(f):
+                found_file = f
+                break
+        
+        # 3. Try to open, modify, and display it safely
+        if found_file:
+            try:
+                image = Image.open(found_file)
+    
+                # --- MODIFICATIONS START ---
+                
+                # A. ROTATE: Change the '-90' value to rotate differently.
+                # 90 = counter-clockwise, -90 = clockwise, 180 = upside down.
+                # expand=True ensures the whole image fits after rotation.
+                image = image.rotate(90, expand=True) 
+    
+                # B. DISPLAY SMALLER:
+                # Removed 'use_container_width=True'
+                # Added 'width=350' (Change this pixel value to make it bigger/smaller)
+                st.image(image, caption="Project Team / Research Group", width=350)
+                
+                # --- MODIFICATIONS END ---
+    
+            except Exception as e:
+                st.warning(f"⚠️ Found '{found_file}' but could not load it. Error: {e}")
+                st.info("Tip: Please check that the file is not corrupted and is a valid PNG or JPG image.")
+        else:
+            st.info("📷 **Tip:** To display a photo here, upload a file named `project_photo.png` or `project_photo.jpg` to your repository.")
+        
+    with col2:
         st.markdown("**Ara Bela Zulfa Laila**")
         st.caption("2304130050")
     
-    with col2:
+    with col3:
         st.markdown("**Khumaerotu Zahra**")
         st.caption("2304130072")
         
-    with col3:
+    with col4:
         st.markdown("**Desty Eka Syawfitri**")
         st.caption("2304130073")
 
-    with col4:
+    with col5:
         st.markdown("**Nabilla Marsha Amanda Putri**")
         st.caption("2304130081")
         
