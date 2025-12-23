@@ -401,7 +401,7 @@ def render_about_page():
     # --- ADDED PHOTO SECTION ---
     # Attempts to load a local file named "project_photo.png" or displays a placeholder tip
     if os.path.exists("project_photo.jpg"):
-        st.image("project_photo.png", caption="Project Team / Research Group", use_container_width=True)
+        st.image("project_photo.jpg", caption="Project Team / Research Group", use_container_width=True)
     else:
         st.info("📷 **Tip:** To display a Team/University photo here, rename your image file to `project_photo.png` and upload it to the same folder as this script.")
 
@@ -447,7 +447,7 @@ def render_about_page():
         
     st.divider()
     st.markdown("""
-    **Institution:** Department of Informatics Engineering  
+    Department of Computer Science  
     Faculty of Mathematics and Natural Sciences  
     **Universitas Negeri Semarang (UNNES)** 2025
     """)
