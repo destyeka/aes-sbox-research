@@ -419,7 +419,7 @@ def render_about_page():
             # A. ROTATE: Change the '-90' value to rotate differently.
             # 90 = counter-clockwise, -90 = clockwise, 180 = upside down.
             # expand=True ensures the whole image fits after rotation.
-            image = image.rotate(-90, expand=True) 
+            image = image.rotate(90, expand=True) 
 
             # B. DISPLAY SMALLER:
             # Removed 'use_container_width=True'
@@ -455,19 +455,23 @@ def render_about_page():
     """)
     
     st.header("Our Team")
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.markdown("**Muhammad Mishbakhuz Zuhail**")
-        st.caption("2304130064")
+        st.markdown("**Ara Bela Zulfa Laila**")
+        st.caption("2304130050")
     
     with col2:
-        st.markdown("**Ahmad Muzakki Ahsan**")
-        st.caption("2304130079")
+        st.markdown("**Khumaerotu Zahra**")
+        st.caption("2304130072")
         
     with col3:
-        st.markdown("**Sheva Aqila Ramadhan**")
-        st.caption("2304130083")
+        st.markdown("**Desty Eka Syawfitri**")
+        st.caption("2304130073")
+
+    with col4:
+        st.markdown("**Nabilla Marsha Amanda Putri**")
+        st.caption("2304130081")
         
     st.divider()
     st.markdown("""
