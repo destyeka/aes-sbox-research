@@ -216,7 +216,7 @@ st.set_page_config(page_title="AES S-Box Project", layout="wide", page_icon="üî
 st.title("üîê AES S-Box Research")
 st.markdown("""
 Modify Affine Matrices, Analyze S-box Strength, and Test Encryption.
-Based on research: *AES S-box modification uses affine matrices exploration fo increased S-Box Strength*.
+Based on research: *AES S-box modification uses affine matrices exploration fo increased S-box strength* (Alamsyah et. al. 2024).
 """)
 
 # --- SIDEBAR CONFIG ---
